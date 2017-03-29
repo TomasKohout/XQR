@@ -12,6 +12,13 @@ EOUTFORM= 4
 EPARSE  = 80
 KEY_ELEMS = ("SELECT", "FROM", "WHERE", "LIMIT", "NOT", "CONTAINS", "=", ">", "<")
 
+def isnumber(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
@@ -64,6 +71,7 @@ def getWord(str):
             break
     if ret == str:
         str = ""
+
     return ret, str
 
 
@@ -110,6 +118,7 @@ def parse(query):
                         else:
                             errhandle(EPARSE)
                 condElem = word
+
                 if query:
                     word, query = getWord(query)
                 else:
@@ -188,15 +197,92 @@ def getParams():
     return output, input, query, queryFlag, qf, qfFlag, n, root
 
 
-def iteroverit(root, input, element, table, notCount, condElem, relOper, literal):
-    if not root[0]:
+def iteroverit(root, element, table):
+    if not root:
         return 0
 
-    for child in root:
-        print([child])
+    xmlroot = None
+    tagName = None
+    attName = None
+    ret     = []
 
+    if table:
+        if table[0] == ".":
+            tagName = table[1:]
+        elif "." in table:
+            splitIt = table.split(".")
+            if len(splitIt) == 2:
+                tagName = splitIt[0]
+                attName = splitIt[1]
+            else:
+                errhandle(EPARSE)
+        else:
+            tagName = table
 
+    if tagName == "ROOT" and attName == None:
+        xmlroot = [root.documentElement]
+    elif tagName == None and attName:
+        if attName[0] == ".":
+            attName = attName[1:]
+
+        tmp = root.getElementsByTagName("*")
+        for t in tmp:
+            if t.hasAttribute(attName):
+                xmlroot = [t]
+    elif tagName and tagName != "ROOT" and attName:
+        tmp = root.getElementsByTagName(tagName)
+        for t in tmp:
+            if t.hasAttribute(attName):
+                xmlroot = [t]
+                break
+    elif tagName and tagName != "ROOT" and not attName:
+        xmlroot = [root.getElementsByTagName(tagName)[0]]
+    else:
+        errhandle(EPARSE)
+
+    if  root.documentElement.tagName == element and tagName == "ROOT":
+        return [root.documentElement]
+    else:
+        for x in xmlroot:
+            ret.extend(x.getElementsByTagName(element))
+
+    return ret
     #iteroverit(root[0], input, element, table, notCount, condElem, relOper, literal)
+
+
+def cond(condElem, relOper, literal):
+
+    elem = condElem
+    lit  = literal
+    if "\"" == lit[0] and "\"" == lit[len(lit)-1]:
+        lit = lit[1:]
+        lit = lit[:len(lit)-1]
+
+    if isnumber(lit) and relOper == "CONTAINS":
+        errhandle(EPARSE)
+
+    if isnumber(elem):
+        elem = float(elem)
+
+    if relOper == "CONTAINS":
+        return lit == elem
+    elif relOper == "<":
+        if isnumber(lit):
+            return elem < float(lit)
+    elif relOper == ">":
+        if isnumber(lit):
+            return elem > float(lit)
+    elif relOper == "=":
+        if isnumber(lit):
+            return elem == float(lit)
+    else:
+        errhandle(EPARSE)
+
+
+def where(element, table, notCount, condElem, relOper, literal):
+    
+
+
 
 
 def main():
@@ -232,14 +318,14 @@ def main():
 
     notCount = notCount % 2 # zjisti, jestli negovat nebo ne
 
-    #print("%s %s %d %s %s %s" % (element, table, notCount, condElem, relOper, literal))
+    print("%s %s %d %s %s %s" % (element, table, notCount, condElem, relOper, literal))
     if not table:
         print("Prazdny dokument nebo hlavicka")
     tree = minidom.parse(input)
-    xmlroot = [tree.documentElement]
 
-    xml = iteroverit(xmlroot, input, element, table, notCount, condElem, relOper, literal)
+    xml = iteroverit(tree, element, table)
 
+    xml = where(element, table, notCount, condElem, relOper, literal)
 
 if __name__ == "__main__":
     main()
