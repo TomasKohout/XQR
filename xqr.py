@@ -61,14 +61,20 @@ def getWord(str):
                     if str.startswith(" "):
                         str = str[1:]
                     if ret == str:
-                        str == ""
+                        str = ""
                     return ret, str
+                elif ret[len(ret)-1:] == s:
+                    str = str[len(ret)-1:]
+                    return ret[:len(ret)-1], str
+
+
         else:
             cut = len(ret)
             str = str[cut:]
             if str.startswith(" "):
                 str = str[1:]
             break
+
     if ret == str:
         str = ""
 
@@ -117,6 +123,7 @@ def parse(query):
                             notCount += 1
                         else:
                             errhandle(EPARSE)
+
                 condElem = word
 
                 if query:
@@ -219,8 +226,10 @@ def iteroverit(root, element, table):
         else:
             tagName = table
 
+
     if tagName == "ROOT" and attName == None:
         xmlroot = [root.documentElement]
+
     elif tagName == None and attName:
         if attName[0] == ".":
             attName = attName[1:]
@@ -229,6 +238,7 @@ def iteroverit(root, element, table):
         for t in tmp:
             if t.hasAttribute(attName):
                 xmlroot = [t]
+                break
     elif tagName and tagName != "ROOT" and attName:
         tmp = root.getElementsByTagName(tagName)
         for t in tmp:
@@ -251,7 +261,6 @@ def iteroverit(root, element, table):
 
 
 def cond(condElem, relOper, literal):
-
     elem = condElem
     lit  = literal
     if "\"" == lit[0] and "\"" == lit[len(lit)-1]:
@@ -265,7 +274,10 @@ def cond(condElem, relOper, literal):
         elem = float(elem)
 
     if relOper == "CONTAINS":
-        return lit == elem
+        if lit in elem:
+            return True
+        else:
+            return False
     elif relOper == "<":
         if isnumber(lit):
             return elem < float(lit)
@@ -275,13 +287,59 @@ def cond(condElem, relOper, literal):
     elif relOper == "=":
         if isnumber(lit):
             return elem == float(lit)
+        elif lit == "True" or lit == "False":
+            return elem == lit
     else:
         errhandle(EPARSE)
 
 
-def where(element, table, notCount, condElem, relOper, literal):
-    
+def where(xml, element, notCount, condElem, relOper, literal):
+    ret = []
+    if notCount == 0:
+        if "." not in condElem: #element
+            for tag in xml:
+                if tag.tagName == condElem:
+                    try:
+                        if cond(tag.firstChild.nodeValue,relOper,literal):
+                            ret.append(tag)
+                            continue
+                    except:
+                        continue
+                for underTag in tag.getElementsByTagName(condElem):
+                    try:
+                        if cond(underTag.firstChild.nodeValue, relOper, literal):
+                            ret.append(tag) #todo is it working?
 
+                        break
+                    except:
+                        break
+        elif condElem[0] == ".": #.att
+            for att in xml:
+                if att.hasAttribute(condElem[1:]):
+                    if cond(att.getAttribute(condElem[1:]),relOper, literal):
+                        ret.append(att)
+                        continue
+
+                for attforsec in att.getElementsByTagName("*"):
+                    if attforsec.hasAttribute(condElem[1:]):
+                        if cond(attforsec.getAttribute(condElem[1:]), relOper, literal):
+                            ret.append(att)
+                            break
+        elif "." in condElem: #ele.att
+            tmp = condElem.split(".")
+            for tag in xml:
+                print(literal, tag.getAttribute(tmp[1]))
+                print(tag.tagName, tag.hasAttribute(tmp[1]), cond(tag.getAttribute(tmp[1]), relOper, literal))
+                if tag.tagName == tmp[0] and tag.hasAttribute(tmp[1]) and cond(tag.getAttribute(tmp[1]), relOper, literal):
+                    print(notCount)
+                    ret.append(tag)
+                    continue
+                for underTag in tag.getElementsByTagName(tmp[0]):
+                    if underTag.hasAttribute(condElem[1:]) and cond(underTag.getAttribute(tmp[1]), relOper, literal):
+                        ret.append(tag)
+                        break
+
+    return ret
 
 
 
@@ -325,7 +383,11 @@ def main():
 
     xml = iteroverit(tree, element, table)
 
-    xml = where(element, table, notCount, condElem, relOper, literal)
+    xml = where(xml, element, notCount, condElem, relOper, literal)
+
+
+    for e in xml:
+        sys.stdout.write(e.toxml())
 
 if __name__ == "__main__":
     main()
