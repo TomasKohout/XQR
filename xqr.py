@@ -144,13 +144,13 @@ def parse(query):
         errhandle(EPARSE)
     return element,table, notCount, condElem, relOper, literal
 
-
+#--qf=./STest/test12.qu --input=./STest/test12.in --root=MyCatalog --output=file.xml
 def getParams():
     try:
         opts, args = getopt.getopt(sys.argv[1:],  "ho:i:q:n::r::",["help", "output=", "input=", "query=", "qf=", "n", "root="])
     except getopt.GetoptError as err:
         print(err)
-        sys.exit(2)
+        sys.exit(EPARAMS)
     output = None
     input  = None
     query  = None
@@ -163,6 +163,13 @@ def getParams():
     for o, a in opts:
         if o in ("-o","--output"):
             output = a #TODO err handle if not folder
+            checkP = output.rfind('/')
+            fold   = output[:checkP+1]
+            print(fold)
+            checkP = Path(fold)
+            if not checkP.is_dir():
+                errhandle(EPARAMS)
+
             if not(output):
                 errhandle(EPARAMS)
         elif o in ("-i", "--input"):
@@ -194,6 +201,8 @@ def getParams():
 
             n = True
         elif o in ("-r", "--root"):
+            if not a:
+                errhandle(EPARAMS)
             root = a
         else:
             assert False, "neznamy parametr"
@@ -328,10 +337,10 @@ def where(xml, element, notCount, condElem, relOper, literal):
         elif "." in condElem: #ele.att
             tmp = condElem.split(".")
             for tag in xml:
-                print(literal, tag.getAttribute(tmp[1]))
-                print(tag.tagName, tag.hasAttribute(tmp[1]), cond(tag.getAttribute(tmp[1]), relOper, literal))
+                #print(literal, tag.getAttribute(tmp[1]))
+                #print(tag.tagName, tag.hasAttribute(tmp[1]), cond(tag.getAttribute(tmp[1]), relOper, literal))
                 if tag.tagName == tmp[0] and tag.hasAttribute(tmp[1]) and cond(tag.getAttribute(tmp[1]), relOper, literal):
-                    print(notCount)
+                   #print(notCount)
                     ret.append(tag)
                     continue
                 for underTag in tag.getElementsByTagName(tmp[0]):
@@ -344,6 +353,7 @@ def where(xml, element, notCount, condElem, relOper, literal):
 
 
 def main():
+    outputF = None
     output = None
     input = None
     query = None
@@ -376,18 +386,40 @@ def main():
 
     notCount = notCount % 2 # zjisti, jestli negovat nebo ne
 
-    print("%s %s %d %s %s %s" % (element, table, notCount, condElem, relOper, literal))
+    #print("%s %s %d %s %s %s" % (element, table, notCount, condElem, relOper, literal))
     if not table:
         print("Prazdny dokument nebo hlavicka")
     tree = minidom.parse(input)
 
     xml = iteroverit(tree, element, table)
 
-    xml = where(xml, element, notCount, condElem, relOper, literal)
+    if condElem:
+        xml = where(xml, element, notCount, condElem, relOper, literal)
 
+    if output:
+        try:
+            outputF = open(output, "w")
+        except (OSError, IOError):
+            errhandle(EOUTPUT)
+        outputF.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+        if root:
+            outputF.write("\n<" + root + ">\n")
+        for x in xml:
+            outputF.write(x.toxml())
+        if root:
+            outputF.write("\n</" + root + ">")
+        outputF.close()
+        return 0
 
+    outputF.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+    if root:
+        sys.stdout.write("\n<" + root + ">\n")
     for e in xml:
         sys.stdout.write(e.toxml())
+    if root:
+        sys.stdout.write("\n"+"<" + root + "/>")
+
+    return 0
 
 if __name__ == "__main__":
     main()
