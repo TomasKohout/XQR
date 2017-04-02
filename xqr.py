@@ -89,6 +89,7 @@ def parse(query):
     condElem = None
     relOper  = None
     literal  = None
+    limit    = None
     if (word == "SELECT"):
         element, query = getWord(query)
         if element in KEY_ELEMS:
@@ -97,18 +98,18 @@ def parse(query):
         if word == "FROM":
 
             if not query:
-                return element, table, notCount, condElem, relOper, literal
+                return element, table, notCount, condElem, relOper, literal, limit
             table, query = getWord(query)
 
             if not query or query.isspace():
-                return element, table, notCount, condElem, relOper, literal
+                return element, table, notCount, condElem, relOper, literal, limit
 
             if table == "WHERE":
                 word = table
                 table = ""
             else:
                 if not query: #WHERE EMPTY
-                    return element, table, notCount, condElem, relOper, literal
+                    return element, table, notCount, condElem, relOper, literal, limit
 
                 word, query = getWord(query)
 
@@ -136,13 +137,30 @@ def parse(query):
                 else:
                     errhandle(EPARSE)
                 literal = word
+
+                if "LIMIT" in query:
+                    word, query = getWord(query)
+                    if word == "LIMIT":
+                        if query:
+                            word, query = getWord(query)
+                        else:
+                            errhandle(EPARSE)
+
+                        if isnumber(word):
+                            limit = word
+                        else:
+                            errhandle(EPARSE)
+
+                    else:
+                        errhandle(EPARSE)
+
             else:
                 errhandle(EPARSE)
         else:
             errhandle(EPARSE)
     else:
         errhandle(EPARSE)
-    return element,table, notCount, condElem, relOper, literal
+    return element,table, notCount, condElem, relOper, literal, limit
 
 #--qf=./STest/test12.qu --input=./STest/test12.in --root=MyCatalog --output=file.xml
 def getParams():
@@ -371,14 +389,15 @@ def main():
     condElem = None
     relOper = None
     literal = None
+    limit = None
     if query and (qfFlag is False):
-        element, table, notCount, condElem, relOper, literal = parse(query)
+        element, table, notCount, condElem, relOper, literal, limit = parse(query)
     elif qfFlag and (queryFlag is False):
         myFile = Path(qf)
         if myFile.is_file():
             file = open(myFile, "r")
             query = file.read()
-            element, table, notCount, condElem, relOper, literal = parse(query)
+            element, table, notCount, condElem, relOper, literal, limit = parse(query)
         else:
             errhandle(EINPUT)
     else:
@@ -411,7 +430,7 @@ def main():
         outputF.close()
         return 0
 
-    outputF.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+    sys.stdout.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
     if root:
         sys.stdout.write("\n<" + root + ">\n")
     for e in xml:
