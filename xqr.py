@@ -19,6 +19,15 @@ def isnumber(s):
     except ValueError:
         return False
 
+
+def isint(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
@@ -146,8 +155,8 @@ def parse(query):
                         else:
                             errhandle(EPARSE)
 
-                        if isnumber(word):
-                            limit = word
+                        if isint(word):
+                            limit = int(word)
                         else:
                             errhandle(EPARSE)
 
@@ -327,7 +336,7 @@ def where(xml, element, notCount, condElem, relOper, literal):
             for tag in xml:
                 if tag.tagName == condElem:
                     try:
-                        if cond(tag.firstChild.nodeValue,relOper,literal):
+                        if cond(tag.firstChild.nodeValue, relOper, literal):
                             ret.append(tag)
                             continue
                     except:
@@ -365,6 +374,14 @@ def where(xml, element, notCount, condElem, relOper, literal):
                     if underTag.hasAttribute(condElem[1:]) and cond(underTag.getAttribute(tmp[1]), relOper, literal):
                         ret.append(tag)
                         break
+
+    elif notCount == 1:
+        fake = where(xml, element, 0, condElem, relOper, literal)
+        for x in xml:
+            if x in fake:
+                continue
+            else:
+                ret.append(x)
 
     return ret
 
@@ -412,15 +429,18 @@ def main():
 
     xml = iteroverit(tree, element, table)
 
-    if condElem:
+    if condElem and relOper and literal:
         xml = where(xml, element, notCount, condElem, relOper, literal)
 
+    if limit:
+        xml = xml[:limit]
     if output:
         try:
             outputF = open(output, "w")
         except (OSError, IOError):
             errhandle(EOUTPUT)
-        outputF.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+        if not n:
+            outputF.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
         if root:
             outputF.write("\n<" + root + ">\n")
         for x in xml:
@@ -430,7 +450,8 @@ def main():
         outputF.close()
         return 0
 
-    sys.stdout.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+    if not n:
+        sys.stdout.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
     if root:
         sys.stdout.write("\n<" + root + ">\n")
     for e in xml:
